@@ -38,13 +38,13 @@ No hand-wiring of VPCs, IAM roles, ALB target groups, or WAF scopes. The hard, e
 
 | Advantage | What it means for you |
 |---|---|
-| ⚡ **Minutes, not days** | A secured ECS microservices stack normally takes days of Terraform wiring — this deploys in one command. |
-| 🔒 **Secure by default** | Single KMS CMK encrypts Aurora, Redis, and SQS. ECR images scanned on push. WAF rate-limits all incoming traffic. |
-| 🏛️ **Compliance-ready** | Built-in `general` / `hipaa` profiles activate Aurora PITR, deletion protection, and tighter WAF rate limits. |
-| 🧩 **Proven building blocks** | Every resource comes from a published, versioned SourceFuse ARC module. Upgrades are a version bump. |
-| 🌍 **Serverless scaling** | Fargate scales tasks without managing nodes. Pay-per-vCPU-second, not per idle EC2 instance. |
-| 📦 **Portable & auditable** | Pure Terraform. Version-controlled, reproducible across environments and accounts. |
-| 🛠️ **Beginner-friendly** | One `Makefile`, copy-paste examples per profile, and step-by-step docs for macOS, Linux, and Windows. |
+| **Minutes, not days** | A secured ECS microservices stack normally takes days of Terraform wiring — this deploys in one command. |
+| **Secure by default** | Single KMS CMK encrypts Aurora, Redis, and SQS. ECR images scanned on push. WAF rate-limits all incoming traffic. |
+| **Compliance-ready** | Built-in `general` / `hipaa` profiles activate Aurora PITR, deletion protection, and tighter WAF rate limits. |
+| **Proven building blocks** | Every resource comes from a published, versioned SourceFuse ARC module. Upgrades are a version bump. |
+| **Serverless scaling** | Fargate scales tasks without managing nodes. Pay-per-vCPU-second, not per idle EC2 instance. |
+| **Portable & auditable** | Pure Terraform. Version-controlled, reproducible across environments and accounts. |
+| **Beginner-friendly** | One `Makefile`, copy-paste examples per profile, and step-by-step docs for macOS, Linux, and Windows. |
 
 ---
 
