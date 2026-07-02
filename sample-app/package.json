@@ -1,0 +1,12 @@
+{
+  "name": "arc-microservices-ecs-sample",
+  "version": "1.0.0",
+  "description": "Sample HTTP service for the ARC Microservices ECS Blueprint",
+  "main": "index.js",
+  "license": "Apache-2.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "test": "node -e \"const h=require('http');const r=h.request({host:'localhost',port:8080,path:'/health'},res=>{if(res.statusCode!==200)process.exit(1);console.log('health check passed')});r.on('error',()=>process.exit(1));r.end()\""
+  }
+}

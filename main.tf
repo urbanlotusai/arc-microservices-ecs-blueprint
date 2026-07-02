@@ -3,14 +3,12 @@
 #    Outputs consumed by: module.db, module.cache, module.sqs
 # ═══════════════════════════════════════════════════════════════════════════════
 module "kms" {
-  source  = "sourcefuse/arc-kms/aws"
-  version = "1.0.11"
+  source = "./modules/01-kms"
 
   alias                   = local.kms_alias
   policy                  = data.aws_iam_policy_document.kms.json
   description             = "CMK for ${local.name_prefix} microservices platform"
   deletion_window_in_days = var.kms_deletion_window
-  enable_key_rotation     = true
 
   tags = local.tags
 }
@@ -20,8 +18,7 @@ module "kms" {
 #    Outputs consumed by: module.security_group, module.ecs, module.db, module.cache, module.alb
 # ═══════════════════════════════════════════════════════════════════════════════
 module "network" {
-  source  = "sourcefuse/arc-network/aws"
-  version = "3.0.14"
+  source = "./modules/02-network"
 
   name        = local.name_prefix
   namespace   = var.namespace
@@ -36,8 +33,7 @@ module "network" {
 #    Outputs consumed by: module.ecs, module.db, module.cache
 # ═══════════════════════════════════════════════════════════════════════════════
 module "security_group" {
-  source  = "sourcefuse/arc-security-group/aws"
-  version = "0.0.5"
+  source = "./modules/03-security-group"
 
   name        = "${local.name_prefix}-platform"
   description = "Security group for ECS tasks, Aurora, and ElastiCache"
@@ -45,11 +41,11 @@ module "security_group" {
 
   ingress_rules = [
     {
-      from_port       = var.container_port
-      to_port         = var.container_port
-      protocol        = "tcp"
-      cidr_blocks     = [var.vpc_cidr]
-      description     = "ECS container port from within VPC"
+      from_port   = var.container_port
+      to_port     = var.container_port
+      protocol    = "tcp"
+      cidr_blocks = [var.vpc_cidr]
+      description = "ECS container port from within VPC"
     },
     {
       from_port   = 5432
@@ -85,11 +81,10 @@ module "security_group" {
 #    Outputs consumed by: module.ecs (task definition image URI)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "ecr" {
-  source  = "sourcefuse/arc-ecr/aws"
-  version = "0.0.4"
+  source = "./modules/04-ecr"
 
   name                 = local.ecr_repo_name
-  image_tag_mutability = "IMMUTABLE"  # prevent tag overwrites in production
+  image_tag_mutability = "IMMUTABLE" # prevent tag overwrites in production
   scan_on_push         = true
 
   # HIPAA: retain last 20 images, expire untagged after 1 day
@@ -110,10 +105,10 @@ module "ecr" {
         rulePriority = 2
         description  = "Keep only the last 20 tagged images"
         selection = {
-          tagStatus   = "tagged"
+          tagStatus     = "tagged"
           tagPrefixList = ["v"]
-          countType   = "imageCountMoreThan"
-          countNumber = 20
+          countType     = "imageCountMoreThan"
+          countNumber   = 20
         }
         action = { type = "expire" }
       }
@@ -128,17 +123,14 @@ module "ecr" {
 #    Outputs consumed by: module.ecs (via environment variables at runtime)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "db" {
-  source  = "sourcefuse/arc-db/aws"
-  version = "4.0.4"
+  source = "./modules/05-db"
 
   name        = local.db_name
   namespace   = var.namespace
   environment = var.environment
 
   engine         = var.db_engine
-  engine_type    = "cluster"
   engine_version = var.db_engine_version
-  license_model  = "general-public-license"
   port           = var.db_engine == "aurora-postgresql" ? 5432 : 3306
 
   username = var.db_username
@@ -148,9 +140,8 @@ module "db" {
     subnet_ids = data.aws_subnets.private.ids
   }
 
-  storage_encrypted = true
-  kms_key_id        = module.kms.key_arn
-  instance_class    = var.db_instance_class
+  kms_key_id     = module.kms.key_arn
+  instance_class = var.db_instance_class
 
   # HIPAA: enable point-in-time recovery
   backup_retention_period = local.is_strict ? 35 : 7
@@ -164,8 +155,7 @@ module "db" {
 #    Outputs consumed by: module.ecs (via environment variables at runtime)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "cache" {
-  source  = "sourcefuse/arc-cache/aws"
-  version = "0.0.7"
+  source = "./modules/06-cache"
 
   name               = local.cache_name
   namespace          = var.namespace
@@ -174,13 +164,10 @@ module "cache" {
   subnet_ids         = data.aws_subnets.private.ids
   security_group_ids = [module.security_group.id]
 
-  node_type        = var.cache_node_type
-  num_cache_nodes  = var.cache_num_cache_nodes
+  node_type       = var.cache_node_type
+  num_cache_nodes = var.cache_num_cache_nodes
 
-  # Encrypt in-transit and at-rest
-  transit_encryption_enabled = true
-  at_rest_encryption_enabled = true
-  kms_key_id                 = module.kms.key_arn
+  kms_key_id = module.kms.key_arn
 
   # HIPAA: enable automatic failover (requires num_cache_nodes >= 2)
   automatic_failover_enabled = local.is_strict ? true : (var.cache_num_cache_nodes > 1)
@@ -193,8 +180,7 @@ module "cache" {
 #    Outputs consumed by: module.ecs (via IAM role + environment variables)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "sqs" {
-  source  = "sourcefuse/arc-sqs/aws"
-  version = "0.0.3"
+  source = "./modules/07-sqs"
 
   name = local.sqs_queue_name
 
@@ -205,8 +191,8 @@ module "sqs" {
   }
 
   kms_config = {
-    key_arn      = module.kms.key_arn
-    create_key   = false
+    key_arn    = module.kms.key_arn
+    create_key = false
   }
 
   dlq_config = {
@@ -223,8 +209,7 @@ module "sqs" {
 #    Outputs consumed by: module.alb (web_acl_arn)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "waf" {
-  source  = "sourcefuse/arc-waf/aws"
-  version = "1.0.6"
+  source = "./modules/08-waf"
 
   web_acl_name           = local.waf_name
   web_acl_default_action = "ALLOW"
@@ -263,8 +248,7 @@ module "waf" {
 #    Outputs consumed by: module.ecs (load_balancer config)
 # ═══════════════════════════════════════════════════════════════════════════════
 module "alb" {
-  source  = "sourcefuse/arc-load-balancer/aws"
-  version = "0.0.3"
+  source = "./modules/09-load-balancer"
 
   name       = local.alb_name
   vpc_id     = module.network.vpc_id
@@ -306,8 +290,7 @@ module "alb" {
 #     Consumes: module.ecr, module.db, module.cache, module.sqs, module.alb
 # ═══════════════════════════════════════════════════════════════════════════════
 module "ecs" {
-  source  = "sourcefuse/arc-ecs/aws"
-  version = "2.0.2"
+  source = "./modules/10-ecs"
 
   ecs_cluster = {
     name = local.cluster_name
@@ -357,10 +340,10 @@ module "ecs" {
             }
           ]
           environment = [
-            { name = "DB_HOST",      value = module.db.cluster_endpoint },
-            { name = "DB_PORT",      value = tostring(var.db_engine == "aurora-postgresql" ? 5432 : 3306) },
-            { name = "REDIS_HOST",   value = module.cache.cluster_address },
-            { name = "SQS_QUEUE",    value = module.sqs.queue_url }
+            { name = "DB_HOST", value = module.db.cluster_endpoint },
+            { name = "DB_PORT", value = tostring(var.db_engine == "aurora-postgresql" ? 5432 : 3306) },
+            { name = "REDIS_HOST", value = module.cache.cluster_address },
+            { name = "SQS_QUEUE", value = module.sqs.queue_url }
           ]
           logConfiguration = {
             logDriver = "awslogs"

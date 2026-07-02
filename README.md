@@ -176,7 +176,20 @@ arc-microservices-ecs-blueprint/
 ├── data.tf                   # caller identity, KMS policy, subnet lookups
 ├── outputs.tf                # ALB DNS, ECR URL, Aurora/Redis endpoints, queue URLs
 ├── version.tf                # Terraform + AWS provider pins
+├── .terraform-version        # tfenv pin (1.9.8)
 ├── terraform.tfvars.example  # copy to terraform.tfvars
+├── modules/                  # one numbered wrapper per ARC module
+│   ├── 01-kms/
+│   ├── 02-network/
+│   ├── 03-security-group/
+│   ├── 04-ecr/
+│   ├── 05-db/
+│   ├── 06-cache/
+│   ├── 07-sqs/
+│   ├── 08-waf/
+│   ├── 09-load-balancer/
+│   └── 10-ecs/
+├── sample-app/                # containerized API proving the ECS stack end-to-end
 ├── examples/
 │   ├── README.md
 │   ├── general.tfvars
