@@ -40,7 +40,7 @@ No hand-wiring of VPCs, IAM roles, ALB target groups, or WAF scopes. The hard, e
 |---|---|
 | **Minutes, not days** | A secured ECS microservices stack normally takes days of Terraform wiring — this deploys in one command. |
 | **Secure by default** | Single KMS CMK encrypts Aurora, Redis, and SQS. ECR images scanned on push. WAF rate-limits all incoming traffic. |
-| **Compliance-ready** | Built-in `general` / `hipaa` profiles activate Aurora PITR, deletion protection, and tighter WAF rate limits. |
+| **Compliance-ready** | Built-in `general` / `hipaa` / `pci_dss` profiles activate Aurora PITR, deletion protection, and tighter WAF rate limits. |
 | **Proven building blocks** | Every resource comes from a published, versioned SourceFuse ARC module. Upgrades are a version bump. |
 | **Serverless scaling** | Fargate scales tasks without managing nodes. Pay-per-vCPU-second, not per idle EC2 instance. |
 | **Portable & auditable** | Pure Terraform. Version-controlled, reproducible across environments and accounts. |
@@ -146,6 +146,7 @@ curl http://$ALB_DNS/health
 |---|---|
 | `general` | KMS rotation on, 7-day Aurora PITR, WAF rate limit 5000 |
 | `hipaa` | Aurora PITR 35 days + deletion protection, WAF rate limit 2000, ECS task concurrency cap |
+| `pci_dss` | Aurora PITR 35 days + deletion protection, WAF rate limit 1000, Redis automatic failover |
 
 ---
 
@@ -179,7 +180,8 @@ arc-microservices-ecs-blueprint/
 ├── examples/
 │   ├── README.md
 │   ├── general.tfvars
-│   └── hipaa.tfvars
+│   ├── hipaa.tfvars
+│   └── pci_dss.tfvars
 ├── docs/
 │   ├── INSTALL.md            # macOS · Linux · Windows setup guide
 │   └── DEPLOYMENT.md        # full deployment + ECR push + rollback

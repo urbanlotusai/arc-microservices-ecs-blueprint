@@ -243,7 +243,7 @@ module "waf" {
       action   = "block"
       statement = {
         rate_based_statement = {
-          limit              = local.is_strict ? 2000 : 5000
+          limit              = local.waf_rate_limit
           aggregate_key_type = "IP"
         }
       }
