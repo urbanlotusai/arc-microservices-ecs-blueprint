@@ -1,0 +1,15 @@
+# ── Mandatory ─────────────────────────────────────────────────────────────────
+environment = "prod"
+namespace   = "myorg"
+db_password = "ChangeMe123!"
+
+# ── Optional overrides (defaults shown) ───────────────────────────────────────
+# region              = "us-east-1"
+# vpc_cidr            = "10.0.0.0/16"
+# compliance_profile  = "general"
+# db_engine           = "aurora-postgresql"
+# db_instance_class   = "db.r6g.large"
+# cache_node_type     = "cache.t3.medium"
+# cache_num_cache_nodes = 2
+# container_image     = "nginx:latest"
+# container_port      = 8080

@@ -1,0 +1,16 @@
+ARC Microservices on ECS Blueprint
+Copyright 2026 SourceFuse
+
+Licensed under the Apache License, Version 2.0.
+
+This product composes:
+  - sourcefuse/arc-kms/aws
+  - sourcefuse/arc-network/aws
+  - sourcefuse/arc-security-group/aws
+  - sourcefuse/arc-ecs/aws
+  - sourcefuse/arc-db/aws
+  - sourcefuse/arc-cache/aws
+  - sourcefuse/arc-sqs/aws
+  - sourcefuse/arc-ecr/aws
+  - sourcefuse/arc-waf/aws
+  - sourcefuse/arc-load-balancer/aws
