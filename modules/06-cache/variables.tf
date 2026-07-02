@@ -1,43 +1,49 @@
-variable "name" {
-  type = string
-}
-
 variable "namespace" {
-  type = string
+  description = "Organization or team namespace"
+  type        = string
+  default     = "arc"
 }
 
 variable "environment" {
-  type = string
+  description = "Environment name"
+  type        = string
+  default     = "dev"
 }
 
-variable "vpc_id" {
-  type = string
-}
-
-variable "subnet_ids" {
-  type = list(string)
-}
-
-variable "security_group_ids" {
-  type = list(string)
-}
-
-variable "node_type" {
-  type = string
-}
-
-variable "num_cache_nodes" {
-  type = number
-}
-
-variable "kms_key_id" {
-  type = string
-}
-
-variable "automatic_failover_enabled" {
-  type = bool
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "tags" {
-  type = map(string)
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default = {
+    ManagedBy = "Terraform"
+    Project   = "arc-microservices-ecs-blueprint"
+  }
+}
+
+variable "state_bucket_name" {
+  description = "S3 bucket name for Terraform state (used to read 02-network, 03-security-group, and 01-kms remote state)"
+  type        = string
+}
+
+variable "node_type" {
+  description = "ElastiCache Redis node type."
+  type        = string
+  default     = "cache.t3.medium"
+}
+
+variable "num_cache_nodes" {
+  description = "Number of ElastiCache Redis nodes."
+  type        = number
+  default     = 2
+}
+
+variable "automatic_failover_enabled" {
+  description = "Enable Multi-AZ automatic failover (requires num_cache_nodes >= 2)."
+  type        = bool
+  default     = true
 }

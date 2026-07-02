@@ -1,19 +1,37 @@
-variable "name" {
-  type = string
-}
-
 variable "namespace" {
-  type = string
+  description = "Organization or team namespace"
+  type        = string
+  default     = "arc"
 }
 
 variable "environment" {
-  type = string
+  description = "Environment name"
+  type        = string
+  default     = "dev"
 }
 
-variable "cidr_block" {
-  type = string
+variable "region" {
+  description = "AWS region"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "tags" {
-  type = map(string)
+  description = "Tags to apply to resources"
+  type        = map(string)
+  default = {
+    ManagedBy = "Terraform"
+    Project   = "arc-microservices-ecs-blueprint"
+  }
+}
+
+variable "state_bucket_name" {
+  description = "S3 bucket name for Terraform state"
+  type        = string
+}
+
+variable "cidr_block" {
+  description = "CIDR block for the platform VPC."
+  type        = string
+  default     = "10.0.0.0/16"
 }

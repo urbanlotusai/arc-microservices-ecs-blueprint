@@ -2,7 +2,7 @@
 
 # ARC Microservices on ECS Blueprint
 
-### Production microservices platform on ECS Fargate — in one `terraform apply`
+### Production microservices platform on ECS Fargate — with independent, per-module Terraform state
 
 **A SourceFuse ARC Blueprint**
 
@@ -20,11 +20,11 @@
 
 A **ready-to-deploy Terraform blueprint** that wires a complete microservices platform on
 AWS ECS Fargate using **10 [SourceFuse ARC](https://registry.terraform.io/namespaces/modules/sourcefuse) modules**.
-One `terraform apply` gives you:
+`make bootstrap` + `make apply` gives you:
 
 - **ECS Fargate cluster** with Container Insights enabled
 - **ALB** (Application Load Balancer) fronted by a **WAF** Web ACL
-- **Aurora PostgreSQL** (KMS-encrypted, PITR on strict profiles)
+- **Aurora PostgreSQL** (KMS-encrypted, longer backup retention + deletion protection on strict profiles)
 - **ElastiCache Redis** (encrypted in-transit + at-rest)
 - **SQS** inter-service queue with built-in DLQ
 - **ECR** container registry (immutable tags, scan-on-push)
@@ -40,11 +40,11 @@ No hand-wiring of VPCs, IAM roles, ALB target groups, or WAF scopes. The hard, e
 |---|---|
 | **Minutes, not days** | A secured ECS microservices stack normally takes days of Terraform wiring — this deploys in one command. |
 | **Secure by default** | Single KMS CMK encrypts Aurora, Redis, and SQS. ECR images scanned on push. WAF rate-limits all incoming traffic. |
-| **Compliance-ready** | Built-in `general` / `hipaa` / `pci_dss` profiles activate Aurora PITR, deletion protection, and tighter WAF rate limits. |
+| **Compliance-ready** | Built-in `general` / `hipaa` / `pci` profiles activate longer Aurora backup retention, deletion protection, and tighter WAF rate limits. |
 | **Proven building blocks** | Every resource comes from a published, versioned SourceFuse ARC module. Upgrades are a version bump. |
 | **Serverless scaling** | Fargate scales tasks without managing nodes. Pay-per-vCPU-second, not per idle EC2 instance. |
 | **Portable & auditable** | Pure Terraform. Version-controlled, reproducible across environments and accounts. |
-| **Beginner-friendly** | One `Makefile`, copy-paste examples per profile, and step-by-step docs for macOS, Linux, and Windows. |
+| **Beginner-friendly** | One `Makefile`, per-module compliance-profile tfvars, and step-by-step docs for macOS, Linux, and Windows. |
 
 ---
 
@@ -93,48 +93,68 @@ No hand-wiring of VPCs, IAM roles, ALB target groups, or WAF scopes. The hard, e
 
 - **Terraform** `>= 1.3` ([install guide](docs/INSTALL.md))
 - **AWS credentials** configured (`aws configure`)
-- **A container image** pushed to ECR (or use `nginx:latest` for initial smoke test)
+- **A container image** pushed to ECR (or use `nginx:latest` for an initial smoke test)
 
-### 2. Configure
+### 2. Clone
 
 ```bash
-git clone https://github.com/sourcefuse/arc-microservices-ecs-blueprint.git
+git clone https://github.com/urbanlotusai/arc-microservices-ecs-blueprint.git
 cd arc-microservices-ecs-blueprint
-
-cp examples/general.tfvars terraform.tfvars
 ```
 
-Edit the mandatory values in `terraform.tfvars`:
+This blueprint uses **independent per-module Terraform state** — there is no root `main.tf`. Each `modules/NN-name/` is applied on its own, with cross-module values (like the VPC ID, KMS key ARN, and Aurora/Redis/SQS/ALB endpoints) resolved via `terraform_remote_state` data sources rather than a parent module.
 
-| Variable | Example |
-|---|---|
-| `environment` | `prod` |
-| `namespace` | `myorg` |
-| `db_password` | `YourSecureDBPassword` |
-| `container_image` | `123456789.dkr.ecr.us-east-1.amazonaws.com/myapp:v1.0.0` |
-
-### 3. Deploy
-
-| Step | With `make` | Raw Terraform (all OS) |
-|---|---|---|
-| Validate | `make validate` | `terraform init -backend=false && terraform validate` |
-| Preview | `make plan` | `terraform plan` |
-| Deploy | `make apply` | `terraform init && terraform apply` |
-
-### 4. Push your container image to ECR
+### 3. Bootstrap the state backend (once per environment)
 
 ```bash
-ECR_URL=$(terraform output -raw ecr_repository_url)
+make bootstrap ENV=dev REGION=us-east-1 NAMESPACE=myorg
+```
+
+Creates the S3 state bucket + DynamoDB lock table every module's backend uses.
+
+### 4. Deploy all modules
+
+```bash
+make apply ENV=dev REGION=us-east-1 NAMESPACE=myorg
+```
+
+This runs `terraform init` + `apply` across `modules/01-kms` through `modules/10-ecs` in dependency order. The `container_image` variable (default `nginx:latest`) can be overridden — either edit `modules/10-ecs/tfvars/general.tfvars` or pass a `-var` override — once you have a real image pushed to ECR (see Step 5).
+
+### Deploy a single module with a compliance profile
+
+```bash
+./scripts/apply-module.sh 10-ecs dev us-east-1 hipaa
+```
+
+Copies `modules/10-ecs/tfvars/hipaa.tfvars` → `terraform.tfvars` for that module, then inits/plans/applies it alone.
+
+| Step | With `make` (all modules) | Single module |
+|---|---|---|
+| Validate | `make validate` | `cd modules/<NN-name> && terraform validate` |
+| Preview | `make plan` | `./scripts/apply-module.sh <name> <env> <region> <profile>` then inspect the plan |
+| Deploy | `make apply` | `./scripts/apply-module.sh <name> <env> <region> <profile>` |
+
+### 5. Push your container image to ECR
+
+```bash
+cd modules/04-ecr
+ECR_URL=$(terraform output -raw repository_url)
+cd ../..
 
 aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URL
-docker tag myapp:latest $ECR_URL:latest
+docker build -t $ECR_URL:latest sample-app/
 docker push $ECR_URL:latest
 ```
 
-### 5. Verify the service
+Or run `make build-sample REGION=us-east-1`. Then re-apply `modules/10-ecs` with the new `container_image` to roll the service.
+
+### 6. Verify the service
 
 ```bash
-ALB_DNS=$(terraform output -raw alb_dns_name)
+cd modules/09-load-balancer
+ALB_DNS=$(terraform output -raw dns_name)
+cd ../..
+
 curl http://$ALB_DNS/health
 ```
 
@@ -144,24 +164,28 @@ curl http://$ALB_DNS/health
 
 | Profile | Effect |
 |---|---|
-| `general` | KMS rotation on, 7-day Aurora PITR, WAF rate limit 5000 |
-| `hipaa` | Aurora PITR 35 days + deletion protection, WAF rate limit 2000, ECS task concurrency cap |
-| `pci_dss` | Aurora PITR 35 days + deletion protection, WAF rate limit 1000, Redis automatic failover |
+| `general` | KMS rotation on, 7-day Aurora backup retention, WAF rate limit 5000 |
+| `hipaa` | Aurora backup retention 35 days + deletion protection, WAF rate limit 2000, Redis automatic failover forced on |
+| `pci` | Aurora backup retention 35 days + deletion protection, WAF rate limit 1000, Redis automatic failover forced on |
+
+Apply a profile to any module with `./scripts/apply-module.sh <module> <env> <region> <profile>`.
 
 ---
 
 ## Key outputs
 
+There is no root output aggregator — each module exposes its own outputs:
+
 ```bash
-terraform output alb_dns_name            # ALB DNS — point your domain here
-terraform output ecr_repository_url      # push container images here
-terraform output db_cluster_endpoint     # Aurora writer endpoint
-terraform output redis_endpoint          # ElastiCache primary endpoint
-terraform output sqs_queue_url           # inter-service queue
-terraform output sqs_dlq_url             # dead-letter queue
-terraform output waf_arn                 # WAF Web ACL ARN
-terraform output kms_key_arn             # CMK
-terraform output vpc_id                  # VPC ID
+(cd modules/09-load-balancer && terraform output dns_name)          # ALB DNS — point your domain here
+(cd modules/04-ecr && terraform output repository_url)              # push container images here
+(cd modules/05-db && terraform output cluster_endpoint)              # Aurora writer endpoint
+(cd modules/06-cache && terraform output cluster_address)            # ElastiCache primary endpoint
+(cd modules/07-sqs && terraform output queue_url)                    # inter-service queue
+(cd modules/07-sqs && terraform output dead_letter_queue_url)        # dead-letter queue
+(cd modules/08-waf && terraform output arn)                          # WAF Web ACL ARN
+(cd modules/01-kms && terraform output key_arn)                      # CMK
+(cd modules/02-network && terraform output vpc_id)                   # VPC ID
 ```
 
 ---
@@ -170,16 +194,15 @@ terraform output vpc_id                  # VPC ID
 
 ```
 arc-microservices-ecs-blueprint/
-├── main.tf                   # 10 ARC module blocks, in dependency order
-├── variables.tf              # all inputs with types & descriptions
-├── locals.tf                 # naming, tags, compliance overlays
-├── data.tf                   # caller identity, KMS policy, subnet lookups
-├── outputs.tf                # ALB DNS, ECR URL, Aurora/Redis endpoints, queue URLs
-├── version.tf                # Terraform + AWS provider pins
-├── .terraform-version        # tfenv pin (1.9.8)
-├── terraform.tfvars.example  # copy to terraform.tfvars
-├── modules/                  # one numbered wrapper per ARC module
+├── bootstrap/                 # creates the S3 + DynamoDB state backend (apply first)
+│   ├── main.tf · variables.tf · outputs.tf
+├── modules/                   # each folder is an independent Terraform root
 │   ├── 01-kms/
+│   │   ├── config.hcl         # static backend key
+│   │   ├── main.tf            # own backend "s3" {}, own provider, own module block
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   └── tfvars/{general,hipaa,pci}.tfvars
 │   ├── 02-network/
 │   ├── 03-security-group/
 │   ├── 04-ecr/
@@ -189,18 +212,17 @@ arc-microservices-ecs-blueprint/
 │   ├── 08-waf/
 │   ├── 09-load-balancer/
 │   └── 10-ecs/
+├── scripts/
+│   └── apply-module.sh        # apply one module with a chosen compliance profile
+├── Makefile                   # bootstrap / init / plan / apply / validate / fmt / build-sample
+├── .terraform-version         # tfenv pin (1.9.8)
 ├── sample-app/                # containerized API proving the ECS stack end-to-end
-├── examples/
-│   ├── README.md
-│   ├── general.tfvars
-│   ├── hipaa.tfvars
-│   └── pci_dss.tfvars
 ├── docs/
 │   ├── INSTALL.md            # macOS · Linux · Windows setup guide
 │   └── DEPLOYMENT.md        # full deployment + ECR push + rollback
 ├── GETTING-STARTED.md        # beginner walkthrough
 ├── CONTRIBUTING.md
-├── CHANGELOG.md · LICENSE · NOTICE · Makefile · VERSION
+├── CHANGELOG.md · LICENSE · NOTICE · VERSION
 └── README.md
 ```
 
@@ -211,7 +233,7 @@ arc-microservices-ecs-blueprint/
 - **[GETTING-STARTED.md](GETTING-STARTED.md)** — zero-to-live walkthrough for first-timers
 - **[docs/INSTALL.md](docs/INSTALL.md)** — install Terraform & AWS CLI on macOS / Linux / Windows
 - **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** — full deployment reference, ECR push, service validation, rollback
-- **[examples/README.md](examples/README.md)** — compliance-profile example files
+- **`modules/*/tfvars/{general,hipaa,pci}.tfvars`** — per-module compliance-profile example files
 
 ---
 
@@ -219,8 +241,8 @@ arc-microservices-ecs-blueprint/
 
 - **WAF scope is REGIONAL** — this blueprint uses ALB (not CloudFront), so `web_acl_scope = "REGIONAL"`. Do not change it to `CLOUDFRONT`.
 - **ECS tasks run in private subnets; ALB in public subnets** — do not change subnet assignments or the ALB health checks will fail.
-- **Two-apply KMS pattern** — the ECS task execution role doesn't exist until after the first apply. Narrow the KMS key policy to least-privilege afterward (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
-- **Container image must exist before ECS service deploys** — push an initial image to ECR before or immediately after the first `terraform apply`.
+- **Two-apply KMS pattern** — the ECS task execution role doesn't exist until after `10-ecs` is first applied. Narrow the KMS key policy to least-privilege afterward (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
+- **Container image must exist before ECS service deploys** — push an initial image to ECR (Step 5) before or immediately after the first `make apply` / `10-ecs` apply.
 
 ---
 
